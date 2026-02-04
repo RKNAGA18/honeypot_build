@@ -43,6 +43,7 @@ except Exception as e:
 # This prevents 422 Errors.
 @app.post("/honeypot")
 async def handle_honeypot(request: Request, background_tasks: BackgroundTasks, x_api_key: str = Header(None)):
+
     
     # 1. READ RAW BODY (No Validation)
     try:
