@@ -35,18 +35,17 @@ except Exception as e:
 
 # --- DATA MODELS ---
 # --- UPDATED DATA MODELS (Flexible for Tester) ---
+# --- UPDATED DATA MODELS (Copy-Paste this over your old models) ---
 class Message(BaseModel):
-    # We add defaults so it doesn't crash if the Tester omits them
-    sender: Optional[str] = "Unknown" 
+    sender: Optional[str] = "Unknown"  # Made optional with default
     text: str
-    timestamp: Optional[str] = None 
+    timestamp: Optional[str] = None    # Made optional with default
 
 class RequestPayload(BaseModel):
     sessionId: str
     message: Message
-    # Make history optional so the Tester doesn't need to send it
-    conversationHistory: Optional[List[Message]] = [] 
-    metadata: Optional[dict] = {}
+    conversationHistory: Optional[List[Message]] = [] # Made optional
+    metadata: Optional[dict] = {}                     # Made optional
 
 # --- API ENDPOINT ---
 @app.post("/honeypot")
