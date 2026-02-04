@@ -34,15 +34,18 @@ except Exception as e:
     print(f"Client Init Error: {e}")
 
 # --- DATA MODELS ---
+# --- UPDATED DATA MODELS (Flexible for Tester) ---
 class Message(BaseModel):
-    sender: str
+    # We add defaults so it doesn't crash if the Tester omits them
+    sender: Optional[str] = "Unknown" 
     text: str
-    timestamp: str
+    timestamp: Optional[str] = None 
 
 class RequestPayload(BaseModel):
     sessionId: str
     message: Message
-    conversationHistory: List[Message]
+    # Make history optional so the Tester doesn't need to send it
+    conversationHistory: Optional[List[Message]] = [] 
     metadata: Optional[dict] = {}
 
 # --- API ENDPOINT ---
