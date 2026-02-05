@@ -6,7 +6,6 @@ from google import genai
 from dotenv import load_dotenv
 
 # --- IMPORTS ---
-# Ensure core/ and utils/ folders exist!
 from core.agent import get_session, update_state, build_system_prompt, SessionState
 from core.forensics import analyze_scam
 from core.fake_data import generate_fake_data
@@ -16,11 +15,11 @@ load_dotenv()
 
 app = FastAPI(title="Agentic Honeypot Pro")
 
-# --- 1. CORS FIX (Fixes ACCESS_ERROR) ---
+# --- 1. CORS FIX (Crucial for Tester) ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False, # Must be False for Wildcard *
+    allow_credentials=False, 
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -37,48 +36,38 @@ try:
 except Exception as e:
     print(f"Client Init Error: {e}")
 
-# --- HEALTH CHECK (Fixes 404s in logs) ---
-@app.get("/")
-async def root():
-    return {"status": "alive", "version": "grandmaster-cors-fixed"}
+# --- 2. SHARED LOGIC (The Brain) ---
+# We move the logic here so both endpoints can use it.
+async def process_honeypot_request(request: Request, background_tasks: BackgroundTasks, x_api_key: str = None):
+    print("🦄 REQUEST RECEIVED: Processing...") 
 
-# --- API ENDPOINT (Fixes INVALID_REQUEST_BODY) ---
-@app.post("/honeypot")
-async def handle_honeypot(request: Request, background_tasks: BackgroundTasks, x_api_key: str = Header(None)):
-    
-    print("🦄 GRANDMASTER CODE: Request Received!") # <--- Look for this in logs!
-
-    # 1. READ RAW BODY (No Pydantic Validation)
+    # Read Body Safely
     try:
         body = await request.json()
     except Exception:
         body = {}
 
-    # 2. Extract Data Safely
+    # Extract Data
     session_id = body.get("sessionId", "test-session-default")
     msg_data = body.get("message", {})
-    if isinstance(msg_data, dict):
-        user_text = msg_data.get("text", "Hello")
-    else:
-        user_text = str(msg_data)
+    user_text = str(msg_data) if not isinstance(msg_data, dict) else msg_data.get("text", "Hello")
 
-    # 3. Security Check (Relaxed)
+    # Security Warning (Log only)
     if x_api_key != MY_SECRET_API_KEY:
         print(f"⚠️ Auth Mismatch: Got {x_api_key}")
 
-    # 4. Agent Logic
+    # Core Logic
     session = get_session(session_id)
     forensics = analyze_scam(user_text)
     new_state = update_state(session, forensics)
     session["scam_confidence"] = max(session["scam_confidence"], forensics["confidence"])
 
-    # 5. AI Generation
+    # AI Response
     system_prompt = build_system_prompt(session, forensics)
     ai_reply = "I am listening."
     
     if client:
         try:
-            # Try multiple models for robustness
             for model in ["gemini-2.0-flash", "gemini-1.5-flash"]:
                 try:
                     response = client.models.generate_content(
@@ -90,20 +79,18 @@ async def handle_honeypot(request: Request, background_tasks: BackgroundTasks, x
                         break
                 except:
                     continue
-        except Exception as e:
-            print(f"AI Error: {e}")
+        except Exception:
+            pass
 
-    # 6. Fake Payment Injection
-    scam_words = ["pay", "send", "deposit", "fee"]
-    if any(w in user_text.lower() for w in scam_words) and session["scam_confidence"] > 0.5:
+    # Fake Payment Trigger
+    if any(w in user_text.lower() for w in ["pay", "send", "fee"]) and session["scam_confidence"] > 0.5:
         fake_proof = generate_fake_data(user_text, "payment_proof")
         ai_reply += f" || {fake_proof}"
 
-    # 7. Callback
+    # Callback
     if new_state == SessionState.HOOKED:
         background_tasks.add_task(send_guvi_callback, session_id, session)
 
-    # 8. Return JSON (Always Success)
     return {
         "status": "success",
         "scamDetected": True,
@@ -118,3 +105,21 @@ async def handle_honeypot(request: Request, background_tasks: BackgroundTasks, x
         },
         "agentMessages": [m.strip() for m in ai_reply.split("||") if m.strip()] or ["Hello?"]
     }
+
+# --- 3. ENDPOINTS ---
+
+# The Correct Endpoint
+@app.post("/honeypot")
+async def endpoint_honeypot(request: Request, background_tasks: BackgroundTasks, x_api_key: str = Header(None)):
+    return await process_honeypot_request(request, background_tasks, x_api_key)
+
+# The "Mistake" Catcher (Fixes 405 Error)
+# If you accidentally use the home URL, this catches it and runs the honeypot anyway.
+@app.post("/")
+async def endpoint_root_post(request: Request, background_tasks: BackgroundTasks, x_api_key: str = Header(None)):
+    print("⚠️ User used wrong URL (Root), redirecting logic...")
+    return await process_honeypot_request(request, background_tasks, x_api_key)
+
+@app.get("/")
+async def root():
+    return {"status": "alive", "message": "Use /honeypot endpoint for POST requests"}
