@@ -2,7 +2,7 @@ from google import genai
 
 # 🚨 PASTE YOUR AIzaSy... KEY DIRECTLY HERE
 # Do not leave it empty. Paste it inside the quotes!
-API_KEY = "AIzaSyDl1Y4rB5emHx9VpaDujcbEEdyg2b8g6vo" 
+API_KEY = "your api" 
 
 print(f"Checking models for Key: {API_KEY[:10]}...")
 
